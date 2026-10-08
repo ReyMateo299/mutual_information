@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mutual Information & Entropy Interactive Explorer (X, Y, Z)</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- KaTeX for crisp mathematical formulas -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    /* SVG diagram region highlight transitions */
+    .venn-region {
+      transition: fill-opacity 0.25s ease, stroke 0.25s ease, stroke-width 0.25s ease;
+      cursor: pointer;
+    }
+    .venn-region:hover, .venn-region.highlighted {
+      fill-opacity: 0.85 !important;
+      stroke: #ffffff !important;
+      stroke-width: 2.5px !important;
+      filter: drop-shadow(0px 0px 6px rgba(255, 255, 255, 0.45));
+    }
+    /* Smooth range slider styling */
+    input[type=range] {
+      accent-color: #6366f1;
+    }
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #111827;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #4b5563;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white">
+
+  <!-- Top Header Navigation -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40 px-4 py-3 sm:px-6">
+    <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-3">
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg leading-tight tracking-tight text-white flex items-center gap-2">
+            Mutual Information & Entropy
+            <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-medium">3-RV System (X, Y, Z)</span>
+          </h1>
+          <p class="text-xs text-slate-400">Euler Venn decomposition & probabilistic causal intuition</p>
+        </div>
+      </div>
+
+      <!-- Presets quick dropdown / badge bar -->
+      <div class="flex items-center gap-2 overflow-x-auto py-1 max-w-full">
+        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Presets:</span>
+        <button onclick="loadPreset('fork')" class="preset-btn px-2.5 py-1 text-xs rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white transition border border-slate-700/60 font-medium whitespace-nowrap" title="Common Cause: X <- Z -> Y (Screening off)">
+          Fork (Screening Off)
+        </button>
+        <button onclick="loadPreset('collider')" class="preset-btn px-2.5 py-1 text-xs rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white transition border border-slate-700/60 font-medium whitespace-nowrap" title="Collider / XOR: X -> Z <- Y (Explaining Away / Synergy)">
+          Collider (XOR / Synergy)
+        </button>
+        <button onclick="loadPreset('markov')" class="preset-btn px-2.5 py-1 text-xs rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white transition border border-slate-700/60 font-medium whitespace-nowrap" title="Markov Chain: X -> Y -> Z (Data Processing Inequality)">
+          Markov Chain
+        </button>
+        <button onclick="loadPreset('independent')" class="preset-btn px-2.5 py-1 text-xs rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white transition border border-slate-700/60 font-medium whitespace-nowrap" title="All random variables independent">
+          Independent
+        </button>
+        <button onclick="loadPreset('redundant')" class="preset-btn px-2.5 py-1 text-xs rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white transition border border-slate-700/60 font-medium whitespace-nowrap" title="Perfect copies: X = Y = Z">
+          Identical (Copy)
+        </button>
+        <button onclick="loadPreset('noisy')" class="preset-btn px-2.5 py-1 text-xs rounded-lg bg-slate-800 hover:bg-indigo-600 text-slate-200 hover:text-white transition border border-slate-700/60 font-medium whitespace-nowrap" title="Channel with bit-flip noise">
+          Noisy Channel
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto w-full p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow">
+    
+    <!-- LEFT PANEL: Visual Venn Diagram & Intuition Highlights (7 cols) -->
+    <div class="lg:col-span-7 flex flex-col gap-6">
+      
+      <!-- Venn Card -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl relative overflow-hidden backdrop-blur flex flex-col">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-2">
+          <div class="flex items-center gap-2">
+            <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+            <h2 class="font-semibold text-sm tracking-wide text-slate-200 uppercase">Information Venn Diagram</h2>
+          </div>
+          <div class="text-xs text-slate-400 flex items-center gap-2">
+            <span>Hover regions or metric cards to isolate information components</span>
+            <button onclick="resetHover()" class="text-indigo-400 hover:text-indigo-300 underline text-xs">Reset view</button>
+          </div>
+        </div>
+
+        <!-- SVG Container -->
+        <div class="relative w-full aspect-[4/3] max-h-[420px] flex items-center justify-center bg-slate-950/60 rounded-xl border border-slate-800/80 p-2">
+          <svg id="vennSvg" viewBox="0 0 500 400" class="w-full h-full select-none">
+            <defs>
+              <!-- Filters and gradients -->
+              <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+            </defs>
+
+            <!-- Base guide circles (subtle outlines) -->
+            <circle cx="185" cy="180" r="125" fill="none" stroke="#3b82f6" stroke-width="1.2" stroke-dasharray="4 4" opacity="0.4" />
+            <circle cx="315" cy="180" r="125" fill="none" stroke="#ef4444" stroke-width="1.2" stroke-dasharray="4 4" opacity="0.4" />
+            <circle cx="250" cy="270" r="125" fill="none" stroke="#10b981" stroke-width="1.2" stroke-dasharray="4 4" opacity="0.4" />
+
+            <!-- Dynamic Venn decomposed 7 atomic regions rendered here -->
+            <g id="vennAtomicPaths"></g>
+
+            <!-- Circle Labels & Variable Badges -->
+            <g id="vennLabels" pointer-events="none">
+              <!-- X Top Left -->
+              <text x="110" y="105" fill="#60a5fa" font-weight="700" font-size="16">H(X)</text>
+              <text id="label-hx-val" x="110" y="125" fill="#93c5fd" font-size="12" font-family="monospace">0.00 bit</text>
+
+              <!-- Y Top Right -->
+              <text x="360" y="105" fill="#f87171" font-weight="700" font-size="16">H(Y)</text>
+              <text id="label-hy-val" x="360" y="125" fill="#fca5a5" font-size="12" font-family="monospace">0.00 bit</text>
+
+              <!-- Z Bottom Center -->
+              <text x="250" y="380" text-anchor="middle" fill="#34d399" font-weight="700" font-size="16">H(Z)</text>
+              <text id="label-hz-val" x="250" y="396" text-anchor="middle" fill="#6ee7b7" font-size="12" font-family="monospace">0.00 bit</text>
+            </g>
+          </svg>
+
+          <!-- Floating Region Tooltip -->
+          <div id="vennTooltip" class="absolute pointer-events-none opacity-0 transition-opacity duration-150 bg-slate-900/95 border border-slate-700 px-3 py-2 rounded-lg shadow-2xl text-xs max-w-[260px] z-20">
+            <div id="tipTitle" class="font-bold text-indigo-300"></div>
+            <div id="tipValue" class="text-emerald-400 font-mono text-sm my-0.5"></div>
+            <div id="tipDesc" class="text-slate-300 text-[11px] leading-tight"></div>
+          </div>
+        </div>
+
+        <!-- Legend / Region overview -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 text-xs">
+          <div class="flex items-center gap-1.5 p-1.5 rounded bg-slate-800/50 border border-slate-800">
+            <span class="w-3 h-3 rounded-full bg-blue-500/80 shrink-0"></span>
+            <span class="truncate text-slate-300 font-mono">H(X|Y,Z)</span>
+          </div>
+          <div class="flex items-center gap-1.5 p-1.5 rounded bg-slate-800/50 border border-slate-800">
+            <span class="w-3 h-3 rounded-full bg-rose-500/80 shrink-0"></span>
+            <span class="truncate text-slate-300 font-mono">H(Y|X,Z)</span>
+          </div>
+          <div class="flex items-center gap-1.5 p-1.5 rounded bg-slate-800/50 border border-slate-800">
+            <span class="w-3 h-3 rounded-full bg-emerald-500/80 shrink-0"></span>
+            <span class="truncate text-slate-300 font-mono">H(Z|X,Y)</span>
+          </div>
+          <div class="flex items-center gap-1.5 p-1.5 rounded bg-slate-800/50 border border-slate-800">
+            <span class="w-3 h-3 rounded-full bg-amber-400/80 shrink-0"></span>
+            <span class="truncate text-slate-300 font-mono">I(X;Y;Z)</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <h3 class="text-sm font-semibold text-slate-200 uppercase tracking-wide flex items-center justify-between pb-2 border-b border-slate-800 mb-3">
+          <span>Intuition & Causal Interpretation</span>
+          <span id="activePresetBadge" class="text-xs px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded border border-indigo-500/30 font-medium">Fork Preset</span>
+        </h3>
+        
+        <div id="insightContent" class="space-y-3 text-xs sm:text-sm text-slate-300 leading-relaxed">
+          <!-- Populated by JS based on current state -->
+        </div>
+
+        <!-- Core Information Inequality Check -->
+        <div class="mt-4 pt-3 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          <div class="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between">
+            <span class="text-slate-400">Chain Rule: <code class="text-slate-200 font-mono">H(X,Y) = H(X) + H(Y|X)</code></span>
+            <span id="chainRuleStatus" class="font-mono text-emerald-400 font-semibold">Holds (✓)</span>
+          </div>
+          <div class="bg-slate-950/60 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between">
+            <span class="text-slate-400">Interaction Type:</span>
+            <span id="interactionTypeBadge" class="font-semibold px-2 py-0.5 rounded text-xs bg-amber-400/20 text-amber-300">Redundancy (I ≥ 0)</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT PANEL: Controls, Joint Probability Table & Metric Inspector (5 cols) -->
+    <div class="lg:col-span-5 flex flex-col gap-6">
+      
+      <!-- Interactive Tuning Sliders -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+          <h2 class="font-semibold text-sm tracking-wide text-slate-200 uppercase">Live Distribution Sliders</h2>
+          <button onclick="randomizeDist()" class="text-xs px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition flex items-center gap-1 border border-slate-700">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Randomize
+          </button>
+        </div>
+
+        <div class="space-y-4 text-xs">
+          <!-- Slider 1 -->
+          <div>
+            <div class="flex justify-between font-medium mb-1">
+              <label for="paramSlider1" id="slider1Label" class="text-slate-300">Coupling parameter (α)</label>
+              <span id="slider1Val" class="font-mono text-indigo-400 font-semibold">0.90</span>
+            </div>
+            <input type="range" id="paramSlider1" min="0" max="1" step="0.01" value="0.9" class="w-full cursor-pointer h-1.5 bg-slate-700 rounded-lg">
+            <p id="slider1Desc" class="text-[11px] text-slate-400 mt-1">Probability that X and Y reflect common cause Z</p>
+          </div>
+
+          <!-- Slider 2 -->
+          <div>
+            <div class="flex justify-between font-medium mb-1">
+              <label for="paramSlider2" id="slider2Label" class="text-slate-300">Noise / Error rate (η)</label>
+              <span id="slider2Val" class="font-mono text-pink-400 font-semibold">0.10</span>
+            </div>
+            <input type="range" id="paramSlider2" min="0" max="0.5" step="0.01" value="0.10" class="w-full cursor-pointer h-1.5 bg-slate-700 rounded-lg">
+            <p id="slider2Desc" class="text-[11px] text-slate-400 mt-1">Inversion probability / Channel disruption</p>
+          </div>
+
+          <!-- Slider 3: Marginal bias -->
+          <div>
+            <div class="flex justify-between font-medium mb-1">
+              <label for="paramSlider3" id="slider3Label" class="text-slate-300">Prior Bias P(Z=1) or P(X=1)</label>
+              <span id="slider3Val" class="font-mono text-emerald-400 font-semibold">0.50</span>
+            </div>
+            <input type="range" id="paramSlider3" min="0.01" max="0.99" step="0.01" value="0.50" class="w-full cursor-pointer h-1.5 bg-slate-700 rounded-lg">
+            <p id="slider3Desc" class="text-[11px] text-slate-400 mt-1">Marginal distribution balance (0.5 = maximal marginal entropy)</p>
+          </div>
+        </div>
+
+        <!-- Custom PMF Toggle Accordion -->
+        <div class="mt-4 pt-3 border-t border-slate-800">
+          <details class="group">
+            <summary class="flex justify-between items-center font-medium text-xs text-indigo-300 hover:text-indigo-200 cursor-pointer list-none select-none">
+              <span>Inspect & Edit Joint Probability Table P(X, Y, Z)</span>
+              <span class="group-open:rotate-180 transition-transform duration-200">▼</span>
+            </summary>
+            <div class="mt-3 pt-2">
+              <p class="text-[11px] text-slate-400 mb-2">Discrete binary variables X, Y, Z ∈ {0, 1}. All 8 events automatically normalize to sum to 1.0.</p>
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-[11px] font-mono border border-slate-800 rounded">
+                  <thead class="bg-slate-950 text-slate-400">
+                    <tr>
+                      <th class="p-1.5 text-center">X</th>
+                      <th class="p-1.5 text-center">Y</th>
+                      <th class="p-1.5 text-center">Z</th>
+                      <th class="p-1.5">P(x,y,z)</th>
+                    </tr>
+                  </thead>
+                  <tbody id="pmfTableBody" class="divide-y divide-slate-800/60 bg-slate-900/60">
+                    <!-- Injected rows with live inputs -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col gap-4">
+        <h2 class="font-semibold text-sm tracking-wide text-slate-200 uppercase flex items-center justify-between">
+          <span>Information Quantities Dashboard</span>
+          <span class="text-xs lowercase font-mono text-slate-400">unit: bits (base-2)</span>
+        </h2>
+
+        <!-- Marginal Entropies -->
+        <div>
+          <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Marginal & Joint Entropies</div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <!-- H(X) -->
+            <div class="metric-card p-2 rounded-xl bg-slate-950/80 border border-blue-900/40 hover:border-blue-500/80 transition cursor-pointer"
+                 onmouseenter="highlightRegions(['r_x', 'r_xy', 'r_xz', 'r_xyz'])" onmouseleave="resetHover()">
+              <div class="text-[10px] text-blue-400 font-bold">H(X)</div>
+              <div id="metric-hx" class="text-sm font-mono font-semibold text-white">0.00</div>
+              <div class="text-[9px] text-slate-400">Uncertainty in X</div>
+            </div>
+            <!-- H(Y) -->
+            <div class="metric-card p-2 rounded-xl bg-slate-950/80 border border-rose-900/40 hover:border-rose-500/80 transition cursor-pointer"
+                 onmouseenter="highlightRegions(['r_y', 'r_xy', 'r_yz', 'r_xyz'])" onmouseleave="resetHover()">
+              <div class="text-[10px] text-rose-400 font-bold">H(Y)</div>
+              <div id="metric-hy" class="text-sm font-mono font-semibold text-white">0.00</div>
+              <div class="text-[9px] text-slate-400">Uncertainty in Y</div>
+            </div>
+            <!-- H(Z) -->
+            <div class="metric-card p-2 rounded-xl bg-slate-950/80 border border-emerald-900/40 hover:border-emerald-500/80 transition cursor-pointer"
+                 onmouseenter="highlightRegions(['r_z', 'r_xz', 'r_yz', 'r_xyz'])" onmouseleave="resetHover()">
+              <div class="text-[10px] text-emerald-400 font-bold">H(Z)</div>
+              <div id="metric-hz" class="text-sm font-mono font-semibold text-white">0.00</div>
+              <div class="text-[9px] text-slate-400">Uncertainty in Z</div>
+            </div>
+            <!-- H(X,Y,Z) -->
+            <div class="metric-card p-2 rounded-xl bg-slate-950/80 border border-purple-900/40 hover:border-purple-500/80 transition cursor-pointer"
+                 onmouseenter="highlightRegions(['r_x','r_y','r_z','r_xy','r_xz','r_yz','r_xyz'])" onmouseleave="resetHover()">
+              <div class="text-[10px] text-purple-400 font-bold">H(X,Y,Z)</div>
+              <div id="metric-hxyz" class="text-sm font-mono font-semibold text-white">0.00</div>
+              <div class="text-[9px] text-slate-400">Total Joint entropy</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pairwise Mutual Information -->
+        <div>
+          <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Pairwise Mutual Information</div>
+          <div class="grid grid-cols-3 gap-2">
+            <!-- I(X;Y) -->
+            <div class="metric-card p-2 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-indigo-400 transition cursor-pointer"
+                 onmouseenter="highlightRegions(['r_xy', 'r_xyz'])" onmouseleave="resetHover()">
+              <div class="text-[10px] text-indigo-400 font-bold">I(X ; Y)</div>
+              <div id="metric-ixy" class="text-sm font-mono font-semibold text-white">0.00</div>
+              <div class="text-[9px] text-slate-400">Overhead X & Y share</div>
+            </div>
+            <!-- I(X;Z) -->
+            <div class="metric-card p-2 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-teal-400 transition cursor-pointer"
+                 onmouseenter="highlightRegions(['r_xz', 'r_xyz'])" onmouseleave="resetHover()">
+              <div class="text-[10px] text-teal-400 font-bold">I(X ; Z)</div>
+              <div id="metric-ixz" class="text-sm font-mono font-semibold text-white">0.00</div>
+              <div class="text-[9px] text-slate-400">Shared X & Z</div>
+            </div>
+            <!-- I(Y;Z) -->
+            <div class="metric-card p-2 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-amber-400 transition cursor-pointer"
+                 onmouseenter="highlightRegions(['r_yz', 'r_xyz'])" onmouseleave="resetHover()">
+              <div class="text-[10px] text-amber-400 font-bold">I(Y ; Z)</div>
+              <div id="metric-iyz" class="text-sm font-mono font-semibold text-white">0.00</div>
+              <div class="text-[9px] text-slate-400">Shared Y & Z</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Conditional Mutual Information & Interaction -->
+        <div>
+          <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Conditional MI & Interaction Information</div>
+          <div class="grid grid-cols-2 gap-2">
+            <!-- I(X;Y|Z) -->
+            <div class="metric-card p-2.5 rounded-xl bg-indigo-950/30 border border-indigo-700/50 hover:border-indigo-400 transition cursor-pointer"
+                 onmouseenter="highlightRegions(['r_xy'])" onmouseleave="resetHover()">
+              <div class="flex justify-between items-center">
+                <span class="text-xs text-indigo-300 font-bold">I(X ; Y | Z)</span>
+                <span class="text-[9px] px-1 rounded bg-indigo-900/60 text-indigo-200">Conditioned</span>
+              </div>
+              <div id="metric-ixy-z" class="text-base font-mono font-semibold text-indigo-200 my-0.5">0.00</div>
+              <div class="text-[9px] text-slate-400">MI between X and Y when Z is known</div>
+            </div>
+
+            <!-- I(X;Y;Z) -->
+            <div class="metric-card p-2.5 rounded-xl bg-amber-950/30 border border-amber-700/50 hover:border-amber-400 transition cursor-pointer"
+                 onmouseenter="highlightRegions(['r_xyz'])" onmouseleave="resetHover()">
+              <div class="flex justify-between items-center">
+                <span class="text-xs text-amber-300 font-bold">I(X ; Y ; Z)</span>
+                <span id="metric-ixyz-tag" class="text-[9px] px-1 rounded bg-amber-900/60 text-amber-200">Redundancy</span>
+              </div>
+              <div id="metric-ixyz" class="text-base font-mono font-semibold text-amber-200 my-0.5">0.00</div>
+              <div class="text-[9px] text-slate-400">Interaction: I(X;Y) − I(X;Y|Z)</div>
+            </div>
+          </div>
+
+          <!-- Other conditional terms -->
+          <div class="grid grid-cols-2 gap-2 mt-2">
+            <div class="metric-card p-2 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-teal-400 transition cursor-pointer"
+                 onmouseenter="highlightRegions(['r_xz'])" onmouseleave="resetHover()">
+              <div class="text-[10px] text-teal-400 font-bold">I(X ; Z | Y)</div>
+              <div id="metric-ixz-y" class="text-xs font-mono font-semibold text-white">0.00</div>
+            </div>
+            <div class="metric-card p-2 rounded-xl bg-slate-950/60 border border-slate-800 hover:border-rose-400 transition cursor-pointer"
+                 onmouseenter="highlightRegions(['r_yz'])" onmouseleave="resetHover()">
+              <div class="text-[10px] text-rose-400 font-bold">I(Y ; Z | X)</div>
+              <div id="metric-iyz-x" class="text-xs font-mono font-semibold text-white">0.00</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Educational Formula Deep-Dive Modal / Expandable Drawer -->
+  <section class="max-w-7xl mx-auto w-full px-4 sm:px-6 pb-8">
+    <div class="bg-slate-900/70 border border-slate-800 rounded-2xl p-5 shadow-lg">
+      <h3 class="text-sm font-semibold text-slate-200 uppercase tracking-wide mb-3 flex items-center gap-2">
+        <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+        Mathematical Reference & Live Derivations
+      </h3>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs leading-relaxed text-slate-300">
+        <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800">
+          <div class="font-bold text-indigo-300 mb-1">Mutual Information</div>
+          <div class="font-mono text-[11px] text-slate-400 mb-2">I(X;Y) = H(X) + H(Y) - H(X,Y)</div>
+          <p>Measures how many bits of uncertainty about <span class="text-blue-300 font-semibold">X</span> vanish when observing <span class="text-rose-300 font-semibold">Y</span>. Always non-negative: <span class="font-mono text-emerald-400">I(X;Y) ≥ 0</span>.</p>
+        </div>
+        <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800">
+          <div class="font-bold text-emerald-300 mb-1">Conditional Mutual Information</div>
+          <div class="font-mono text-[11px] text-slate-400 mb-2">I(X;Y|Z) = H(X|Z) + H(Y|Z) - H(X,Y|Z)</div>
+          <p>Uncertainty shared between <span class="text-blue-300">X</span> and <span class="text-rose-300">Y</span> after learning <span class="text-emerald-300">Z</span>. If <span class="font-mono text-indigo-300">I(X;Y|Z) = 0</span>, <span class="text-blue-300">X</span> and <span class="text-rose-300">Y</span> are conditionally independent given <span class="text-emerald-300">Z</span>.</p>
+        </div>
+        <div class="p-3 bg-slate-950/60 rounded-xl border border-slate-800">
+          <div class="font-bold text-amber-300 mb-1">Interaction Information / Synergy</div>
+          <div class="font-mono text-[11px] text-slate-400 mb-2">I(X;Y;Z) = I(X;Y) - I(X;Y|Z)</div>
+          <p>Can be <strong class="text-amber-300">positive</strong> (Z explains shared redundant information) or <strong class="text-purple-300">negative</strong> (synergy / collider: knowing Z reveals relationship unseen separately!).</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    /* =========================================================================
+     * 1. PROBABILITY STATE & PRESET DEFINITIONS
+     * ========================================================================= */
+    let currentPreset = 'fork';
+    
+    // PMF table: keys '000' to '111' representing (X, Y, Z)
+    let jointPMF = {};
+
+    // Sliders state
+    const params = {
+      p1: 0.9,   // alpha / primary correlation
+      p2: 0.1,   // noise / flip rate
+      p3: 0.5    // prior p(Z=1) or p(X=1)
+    };
+
+    const PRESET_METADATA = {
+      fork: {
+        name: "Common Cause / Fork (X ← Z → Y)",
+        badge: "Fork Preset",
+        slider1: { label: "Correlation with Z (α)", min: 0, max: 1, step: 0.01, desc: "P(X=z|Z=z) and P(Y=z|Z=z)" },
+        slider2: { label: "Observation Noise (η)", min: 0, max: 0.5, step: 0.01, desc: "Independent sensor noise on X and Y" },
+        slider3: { label: "Prior P(Z = 1)", min: 0.01, max: 0.99, step: 0.01, desc: "Distribution bias of common cause Z" },
+        builder: (p1, p2, p3) => buildForkDistribution(p1, p2, p3),
+        explanation: `
+          <p><strong class="text-emerald-300">Screening Off Principle:</strong> Here, <span class="font-mono text-emerald-400">Z</span> is the common cause of both <span class="font-mono text-blue-400">X</span> and <span class="font-mono text-rose-400">Y</span> (e.g., Rain causes Wet Grass and Muddy Shoes).</p>
+          <div class="p-2.5 rounded bg-slate-950 border border-slate-800 text-xs my-2">
+            <div>• <strong class="text-indigo-400">I(X;Y) &gt; 0:</strong> X and Y appear strongly correlated because they share the common origin Z.</div>
+            <div class="mt-1">• <strong class="text-emerald-400">I(X;Y|Z) ≈ 0:</strong> Once you directly observe Z, learning X gives <em class="text-slate-200">zero new information</em> about Y! Z "screens off" X from Y.</div>
+            <div class="mt-1">• <strong class="text-amber-400">I(X;Y;Z) &gt; 0 (Redundancy):</strong> Both variables carry duplicate information about the cause.</div>
+          </div>
+        `
+      },
+      collider: {
+        name: "Collider / Explaining Away / XOR (X → Z ← Y)",
+        badge: "Collider (Synergy)",
+        slider1: { label: "XOR Noise (η)", min: 0, max: 0.5, step: 0.01, desc: "Noise flip in Z = X ⊕ Y" },
+        slider2: { label: "Prior P(X = 1)", min: 0.05, max: 0.95, step: 0.01, desc: "Marginal probability of cause X" },
+        slider3: { label: "Prior P(Y = 1)", min: 0.05, max: 0.95, step: 0.01, desc: "Marginal probability of cause Y" },
+        builder: (p1, p2, p3) => buildColliderDistribution(p1, p2, p3),
+        explanation: `
+          <p><strong class="text-purple-300">Synergy & "Explaining Away":</strong> X and Y independently cause collider outcome <span class="font-mono text-emerald-400">Z = X ⊕ Y</span> (e.g., two keys needed to turn a lock).</p>
+          <div class="p-2.5 rounded bg-slate-950 border border-slate-800 text-xs my-2">
+            <div>• <strong class="text-indigo-400">I(X;Y) = 0:</strong> Causes X and Y are completely independent marginally.</div>
+            <div class="mt-1">• <strong class="text-emerald-400">I(X;Y|Z) &gt; 0:</strong> Once Z is known, learning X immediately reveals Y! Conditioning creates dependence.</div>
+            <div class="mt-1">• <strong class="text-purple-400">I(X;Y;Z) &lt; 0 (Synergy):</strong> Interaction information is strictly negative. The whole is greater than the sum of parts.</div>
+          </div>
+        `
+      },
+      markov: {
+        name: "Markov Chain / Cascade (X → Y → Z)",
+        badge: "Markov Chain",
+        slider1: { label: "Channel 1 Reliability P(Y|X)", min: 0.5, max: 1.0, step: 0.01, desc: "Fidelity of first link X → Y" },
+        slider2: { label: "Channel 2 Reliability P(Z|Y)", min: 0.5, max: 1.0, step: 0.01, desc: "Fidelity of second link Y → Z" },
+        slider3: { label: "Prior P(X = 1)", min: 0.05, max: 0.95, step: 0.01, desc: "Input entropy of signal X" },
+        builder: (p1, p2, p3) => buildMarkovDistribution(p1, p2, p3),
+        explanation: `
+          <p><strong class="text-indigo-300">Data Processing Inequality:</strong> Information processed through cascade <span class="font-mono text-blue-400">X</span> → <span class="font-mono text-rose-400">Y</span> → <span class="font-mono text-emerald-400">Z</span> cannot increase: <span class="font-mono text-emerald-400">I(X;Z) ≤ I(X;Y)</span>.</p>
+          <div class="p-2.5 rounded bg-slate-950 border border-slate-800 text-xs my-2">
+            <div>• <strong class="text-indigo-400">I(X;Z|Y) = 0:</strong> Conditioned on intermediate step Y, past X and future Z are conditionally independent.</div>
+            <div class="mt-1">• Any processing or channel noise on Y inevitably degrades downstream knowledge of X.</div>
+          </div>
+        `
+      },
+      independent: {
+        name: "Independent Trio (X ⊥ Y ⊥ Z)",
+        badge: "Independent",
+        slider1: { label: "P(X = 1)", min: 0.01, max: 0.99, step: 0.01, desc: "Bias of variable X" },
+        slider2: { label: "P(Y = 1)", min: 0.01, max: 0.99, step: 0.01, desc: "Bias of variable Y" },
+        slider3: { label: "P(Z = 1)", min: 0.01, max: 0.99, step: 0.01, desc: "Bias of variable Z" },
+        builder: (p1, p2, p3) => buildIndependentDistribution(p1, p2, p3),
+        explanation: `
+          <p><strong class="text-slate-300">Zero Shared Information:</strong> All three variables are generated completely independently: <span class="font-mono text-slate-400">P(X,Y,Z) = P(X)P(Y)P(Z)</span>.</p>
+          <div class="p-2.5 rounded bg-slate-950 border border-slate-800 text-xs my-2">
+            <div>• All pairwise mutual informations are identically zero: <span class="font-mono text-indigo-400">I(X;Y) = I(X;Z) = I(Y;Z) = 0</span>.</div>
+            <div class="mt-1">• Joint entropy is purely additive: <span class="font-mono text-slate-200">H(X,Y,Z) = H(X) + H(Y) + H(Z)</span>.</div>
+          </div>
+        `
+      },
+      redundant: {
+        name: "Identical Clones (X = Y = Z)",
+        badge: "Redundant Copy",
+        slider1: { label: "Noise / Mutation Rate (η)", min: 0, max: 0.3, step: 0.005, desc: "Distortion between identical copies" },
+        slider2: { label: "Unused / Aux", min: 0, max: 1, step: 0.05, desc: "Fixed parameter" },
+        slider3: { label: "Prior P(X = 1)", min: 0.01, max: 0.99, step: 0.01, desc: "Underlying bit distribution" },
+        builder: (p1, p2, p3) => buildRedundantDistribution(p1, p2, p3),
+        explanation: `
+          <p><strong class="text-amber-300">Pure Redundancy:</strong> All three variables repeat the exact same piece of information.</p>
+          <div class="p-2.5 rounded bg-slate-950 border border-slate-800 text-xs my-2">
+            <div>• At zero noise, <span class="font-mono text-emerald-400">H(X) = H(Y) = H(Z) = I(X;Y) = I(X;Y;Z)</span>.</div>
+            <div class="mt-1">• The Venn diagram circles collapse into one single shared core. Conditional entropy <span class="font-mono text-slate-300">H(X|Y) = 0</span>.</div>
+          </div>
+        `
+      },
+      noisy: {
+        name: "Binary Symmetric Channel (X → Y) & Observer Z",
+        badge: "Noisy Channel",
+        slider1: { label: "Channel Error Probability (ε)", min: 0, max: 0.5, step: 0.01, desc: "Bit flip rate across channel" },
+        slider2: { label: "Observer Z Fidelity", min: 0.5, max: 1.0, step: 0.01, desc: "How accurately Z taps into signal" },
+        slider3: { label: "Input Signal P(X = 1)", min: 0.01, max: 0.99, step: 0.01, desc: "Input transmitter distribution" },
+        builder: (p1, p2, p3) => buildNoisyChannelDistribution(p1, p2, p3),
+        explanation: `
+          <p><strong class="text-cyan-300">Channel Capacity & Noise:</strong> X transmits over a noisy channel into Y, while Z is an eavesdropper/monitor.</p>
+          <div class="p-2.5 rounded bg-slate-950 border border-slate-800 text-xs my-2">
+            <div>• As error ε reaches 0.5, channel capacity drops to 0 and <span class="font-mono text-indigo-400">I(X;Y) → 0</span>.</div>
+            <div class="mt-1">• Conditional mutual information quantifies how much unique info remains uncorrupted.</div>
+          </div>
+        `
+      }
+    };
+
+    function buildForkDistribution(alpha, noise, pz) {
+      // Z ~ Bern(pz)
+      // X = Z with prob (1 - noise), else flipped
+      // Y = Z with prob (1 - noise), else flipped
+      // alpha adjusts coupling strength
+      const pmf = {};
+      for (let x = 0; x <= 1; x++) {
+        for (let y = 0; y <= 1; y++) {
+          for (let z = 0; z <= 1; z++) {
+            const p_z = (z === 1) ? pz : (1 - pz);
+            // P(X|Z)
+            const px_match = (1 - noise) * alpha + 0.5 * (1 - alpha);
+            const p_x_given_z = (x === z) ? px_match : (1 - px_match);
+            // P(Y|Z)
+            const py_match = (1 - noise) * alpha + 0.5 * (1 - alpha);
+            const p_y_given_z = (y === z) ? py_match : (1 - py_match);
+
+            pmf[`${x}${y}${z}`] = p_z * p_x_given_z * p_y_given_z;
+          }
+        }
+      }
+      return normalizePMF(pmf);
+    }
+
+    function buildColliderDistribution(noise, px, py) {
+      // X ~ Bern(px), Y ~ Bern(py)
+      // Z = X XOR Y with prob (1 - noise)
+      const pmf = {};
+      for (let x = 0; x <= 1; x++) {
+        for (let y = 0; y <= 1; y++) {
+          for (let z = 0; z <= 1; z++) {
+            const p_x = (x === 1) ? px : (1 - px);
+            const p_y = (y === 1) ? py : (1 - py);
+            const xor = x ^ y;
+            const p_z_given_xy = (z === xor) ? (1 - noise) : noise;
+            pmf[`${x}${y}${z}`] = p_x * p_y * p_z_given_xy;
+          }
+        }
+      }
+      return normalizePMF(pmf);
+    }
+
+    function buildMarkovDistribution(r1, r2, px) {
+      // X -> Y -> Z
+      const pmf = {};
+      for (let x = 0; x <= 1; x++) {
+        for (let y = 0; y <= 1; y++) {
+          for (let z = 0; z <= 1; z++) {
+            const p_x = (x === 1) ? px : (1 - px);
+            const p_y_x = (y === x) ? r1 : (1 - r1);
+            const p_z_y = (z === y) ? r2 : (1 - r2);
+            pmf[`${x}${y}${z}`] = p_x * p_y_x * p_z_y;
+          }
+        }
+      }
+      return normalizePMF(pmf);
+    }
+
+    function buildIndependentDistribution(px, py, pz) {
+      const pmf = {};
+      for (let x = 0; x <= 1; x++) {
+        for (let y = 0; y <= 1; y++) {
+          for (let z = 0; z <= 1; z++) {
+            const p_x = (x === 1) ? px : (1 - px);
+            const p_y = (y === 1) ? py : (1 - py);
+            const p_z = (z === 1) ? pz : (1 - pz);
+            pmf[`${x}${y}${z}`] = p_x * p_y * p_z;
+          }
+        }
+      }
+      return normalizePMF(pmf);
+    }
+
+    function buildRedundantDistribution(noise, dummy, px) {
+      const pmf = {};
+      for (let x = 0; x <= 1; x++) {
+        for (let y = 0; y <= 1; y++) {
+          for (let z = 0; z <= 1; z++) {
+            const p_x = (x === 1) ? px : (1 - px);
+            const p_y_x = (y === x) ? (1 - noise) : noise;
+            const p_z_x = (z === x) ? (1 - noise) : noise;
+            pmf[`${x}${y}${z}`] = p_x * p_y_x * p_z_x;
+          }
+        }
+      }
+      return normalizePMF(pmf);
+    }
+
+    function buildNoisyChannelDistribution(eps, fid, px) {
+      const pmf = {};
+      for (let x = 0; x <= 1; x++) {
+        for (let y = 0; y <= 1; y++) {
+          for (let z = 0; z <= 1; z++) {
+            const p_x = (x === 1) ? px : (1 - px);
+            const p_y_x = (y === x) ? (1 - eps) : eps;
+            const p_z_x = (z === x) ? fid : (1 - fid);
+            pmf[`${x}${y}${z}`] = p_x * p_y_x * p_z_x;
+          }
+        }
+      }
+      return normalizePMF(pmf);
+    }
+
+    function normalizePMF(pmf) {
+      let sum = 0;
+      for (const k in pmf) sum += pmf[k];
+      if (sum <= 0) return pmf;
+      const normalized = {};
+      for (const k in pmf) {
+        normalized[k] = pmf[k] / sum;
+      }
+      return normalized;
+    }
+
+    function shannonH(probs) {
+      let h = 0;
+      for (const p of probs) {
+        if (p > 1e-12) {
+          h -= p * Math.log2(p);
+        }
+      }
+      return Math.max(0, h);
+    }
+
+    function computeAllInformationQuantities(pmf) {
+      // 1. Joint H(X,Y,Z)
+      const allP = Object.values(pmf);
+      const H_XYZ = shannonH(allP);
+
+      // Marginals
+      let pX = [0, 0], pY = [0, 0], pZ = [0, 0];
+      let pXY = {}, pXZ = {}, pYZ = {};
+
+      for (let x = 0; x <= 1; x++) {
+        for (let y = 0; y <= 1; y++) {
+          for (let z = 0; z <= 1; z++) {
+            const p = pmf[`${x}${y}${z}`] || 0;
+            pX[x] += p;
+            pY[y] += p;
+            pZ[z] += p;
+            
+            pXY[`${x}${y}`] = (pXY[`${x}${y}`] || 0) + p;
+            pXZ[`${x}${z}`] = (pXZ[`${x}${z}`] || 0) + p;
+            pYZ[`${y}${z}`] = (pYZ[`${y}${z}`] || 0) + p;
+          }
+        }
+      }
+
+      const H_X = shannonH(pX);
+      const H_Y = shannonH(pY);
+      const H_Z = shannonH(pZ);
+
+      const H_XY = shannonH(Object.values(pXY));
+      const H_XZ = shannonH(Object.values(pXZ));
+      const H_YZ = shannonH(Object.values(pYZ));
+
+      // Pairwise Mutual Informations
+      const I_XY = Math.max(0, H_X + H_Y - H_XY);
+      const I_XZ = Math.max(0, H_X + H_Z - H_XZ);
+      const I_YZ = Math.max(0, H_Y + H_Z - H_YZ);
+
+      // Conditional Entropies
+      const H_X_given_YZ = Math.max(0, H_XYZ - H_YZ);
+      const H_Y_given_XZ = Math.max(0, H_XYZ - H_XZ);
+      const H_Z_given_XY = Math.max(0, H_XYZ - H_XY);
+
+      // Conditional Mutual Informations
+      // I(X;Y|Z) = H(X,Z) + H(Y,Z) - H(X,Y,Z) - H(Z) = H(X|Z) - H(X|Y,Z)
+      const I_XY_given_Z = Math.max(0, H_XZ + H_YZ - H_XYZ - H_Z);
+      const I_XZ_given_Y = Math.max(0, H_XY + H_YZ - H_XYZ - H_Y);
+      const I_YZ_given_X = Math.max(0, H_XY + H_XZ - H_XYZ - H_X);
+
+      // Interaction Information I(X;Y;Z)
+      // I(X;Y;Z) = I(X;Y) - I(X;Y|Z) = H(X) + H(Y) + H(Z) - H(XY) - H(XZ) - H(YZ) + H(XYZ)
+      const I_XYZ = I_XY - I_XY_given_Z;
+
+      // 7 Atomic Euler/Venn components:
+      // In classic information diagrams:
+      // r_x = H(X|Y,Z)
+      // r_y = H(Y|X,Z)
+      // r_z = H(Z|X,Y)
+      // r_xy = I(X;Y|Z)
+      // r_xz = I(X;Z|Y)
+      // r_yz = I(Y;Z|X)
+      // r_xyz = I(X;Y;Z)
+      return {
+        H_X, H_Y, H_Z,
+        H_XY, H_XZ, H_YZ,
+        H_XYZ,
+        I_XY, I_XZ, I_YZ,
+        H_X_given_YZ, H_Y_given_XZ, H_Z_given_XY,
+        I_XY_given_Z, I_XZ_given_Y, I_YZ_given_X,
+        I_XYZ,
+        // Atomic regions for diagram representation
+        atomic: {
+          r_x: H_X_given_YZ,
+          r_y: H_Y_given_XZ,
+          r_z: H_Z_given_XY,
+          r_xy: I_XY_given_Z,
+          r_xz: I_XZ_given_Y,
+          r_yz: I_YZ_given_X,
+          r_xyz: I_XYZ
+        }
+      };
+    }
+
+    // Circle centers and radius for clean, balanced Venn
+    const C_X = { x: 190, y: 175, r: 120 };
+    const C_Y = { x: 310, y: 175, r: 120 };
+    const C_Z = { x: 250, y: 265, r: 120 };
+
+    // Precise SVG paths constructed via clipped constructive geometry
+    function renderVennPaths(metrics) {
+      const container = document.getElementById('vennAtomicPaths');
+      container.innerHTML = '';
+
+      const { atomic } = metrics;
+
+      // Definitions of the 7 regions with custom colors and labels
+      const regionDefs = [
+        {
+          id: 'r_x',
+          name: 'H(X | Y, Z)',
+          desc: 'Unique information in X that cannot be deduced from either Y or Z.',
+          val: atomic.r_x,
+          fill: '#3b82f6', // blue
+          // Path: inside X, outside Y, outside Z
+          d: "M 190,55 A 120,120 0 0,1 250,146 A 120,120 0 0,0 157,203 A 120,120 0 0,1 190,55 Z"
+        },
+        {
+          id: 'r_y',
+          name: 'H(Y | X, Z)',
+          desc: 'Unique information in Y that cannot be deduced from either X or Z.',
+          val: atomic.r_y,
+          fill: '#ef4444', // red
+          // Path: inside Y, outside X, outside Z
+          d: "M 310,55 A 120,120 0 0,1 343,203 A 120,120 0 0,0 250,146 A 120,120 0 0,1 310,55 Z"
+        },
+        {
+          id: 'r_z',
+          name: 'H(Z | X, Y)',
+          desc: 'Unique information in Z that cannot be deduced from either X or Y.',
+          val: atomic.r_z,
+          fill: '#10b981', // emerald
+          // Path: inside Z, outside X, outside Y
+          d: "M 250,385 A 120,120 0 0,1 143,295 A 120,120 0 0,0 223,280 A 120,120 0 0,0 277,280 A 120,120 0 0,0 357,295 A 120,120 0 0,1 250,385 Z"
+        },
+        {
+          id: 'r_xy',
+          name: 'I(X ; Y | Z)',
+          desc: 'Shared information between X and Y that is independent of Z.',
+          val: atomic.r_xy,
+          fill: '#8b5cf6', // violet
+          // Path: inside X & Y, outside Z
+          d: "M 250,90 A 120,120 0 0,1 278,146 A 120,120 0 0,0 222,146 A 120,120 0 0,1 250,90 Z"
+        },
+        {
+          id: 'r_xz',
+          name: 'I(X ; Z | Y)',
+          desc: 'Shared information between X and Z that is independent of Y.',
+          val: atomic.r_xz,
+          fill: '#06b6d4', // cyan
+          // Path: inside X & Z, outside Y
+          d: "M 157,203 A 120,120 0 0,1 222,146 A 120,120 0 0,0 223,280 A 120,120 0 0,1 157,203 Z"
+        },
+        {
+          id: 'r_yz',
+          name: 'I(Y ; Z | X)',
+          desc: 'Shared information between Y and Z that is independent of X.',
+          val: atomic.r_yz,
+          fill: '#f59e0b', // amber
+          // Path: inside Y & Z, outside X
+          d: "M 343,203 A 120,120 0 0,1 277,280 A 120,120 0 0,0 278,146 A 120,120 0 0,1 343,203 Z"
+        },
+        {
+          id: 'r_xyz',
+          name: 'I(X ; Y ; Z) (Interaction Information)',
+          desc: atomic.r_xyz >= 0 
+            ? 'Positive: Redundant information shared simultaneously across all 3 variables.'
+            : 'Negative: Synergistic information! (Collider / XOR effect: variables only reveal info together)',
+          val: atomic.r_xyz,
+          fill: atomic.r_xyz >= 0 ? '#fbbf24' : '#c084fc', // gold for redundancy, electric purple for synergy
+          // Path: Central intersection (X & Y & Z)
+          d: "M 250,146 A 120,120 0 0,1 278,206 A 120,120 0 0,1 222,206 A 120,120 0 0,1 250,146 Z"
+        }
+      ];
+
+      regionDefs.forEach(r => {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', r.d);
+        path.setAttribute('id', `region-${r.id}`);
+        path.setAttribute('class', 'venn-region');
+        path.setAttribute('fill', r.fill);
+        // Scale opacity with value for intuitive density representation
+        const baseOpacity = Math.min(0.75, Math.max(0.18, Math.abs(r.val) * 0.7));
+        path.setAttribute('fill-opacity', baseOpacity.toFixed(2));
+        path.setAttribute('stroke', r.fill);
+        path.setAttribute('stroke-width', '1.2');
+
+        // Events
+        path.addEventListener('mouseenter', (e) => showTooltip(e, r));
+        path.addEventListener('mousemove', (e) => moveTooltip(e));
+        path.addEventListener('mouseleave', () => hideTooltip());
+
+        container.appendChild(path);
+      });
+    }
+
+    function updateUI() {
+      const metrics = computeAllInformationQuantities(jointPMF);
+
+      // 1. Text metric cards
+      document.getElementById('metric-hx').textContent = metrics.H_X.toFixed(3);
+      document.getElementById('metric-hy').textContent = metrics.H_Y.toFixed(3);
+      document.getElementById('metric-hz').textContent = metrics.H_Z.toFixed(3);
+      document.getElementById('metric-hxyz').textContent = metrics.H_XYZ.toFixed(3);
+
+      document.getElementById('metric-ixy').textContent = metrics.I_XY.toFixed(3);
+      document.getElementById('metric-ixz').textContent = metrics.I_XZ.toFixed(3);
+      document.getElementById('metric-iyz').textContent = metrics.I_YZ.toFixed(3);
+
+      document.getElementById('metric-ixy-z').textContent = metrics.I_XY_given_Z.toFixed(3);
+      document.getElementById('metric-ixz-y').textContent = metrics.I_XZ_given_Y.toFixed(3);
+      document.getElementById('metric-iyz-x').textContent = metrics.I_YZ_given_X.toFixed(3);
+
+      const ixyz = metrics.I_XYZ;
+      const ixyzEl = document.getElementById('metric-ixyz');
+      const ixyzTag = document.getElementById('metric-ixyz-tag');
+      ixyzEl.textContent = (ixyz >= 0 ? '+' : '') + ixyz.toFixed(3);
+      
+      const badgeType = document.getElementById('interactionTypeBadge');
+      if (ixyz > 0.01) {
+        ixyzTag.textContent = "Redundancy";
+        ixyzTag.className = "text-[9px] px-1 rounded bg-amber-900/60 text-amber-200";
+        badgeType.textContent = "Redundancy (I > 0)";
+        badgeType.className = "font-semibold px-2 py-0.5 rounded text-xs bg-amber-400/20 text-amber-300";
+      } else if (ixyz < -0.01) {
+        ixyzTag.textContent = "Synergy (Negative)";
+        ixyzTag.className = "text-[9px] px-1 rounded bg-purple-900/60 text-purple-200";
+        badgeType.textContent = "Synergy / Collider (I < 0)";
+        badgeType.className = "font-semibold px-2 py-0.5 rounded text-xs bg-purple-500/20 text-purple-300";
+      } else {
+        ixyzTag.textContent = "Independent";
+        ixyzTag.className = "text-[9px] px-1 rounded bg-slate-800 text-slate-300";
+        badgeType.textContent = "Zero Interaction (I ≈ 0)";
+        badgeType.className = "font-semibold px-2 py-0.5 rounded text-xs bg-slate-800 text-slate-300";
+      }
+
+      // Diagram main variable badges
+      document.getElementById('label-hx-val').textContent = metrics.H_X.toFixed(2) + ' bit';
+      document.getElementById('label-hy-val').textContent = metrics.H_Y.toFixed(2) + ' bit';
+      document.getElementById('label-hz-val').textContent = metrics.H_Z.toFixed(2) + ' bit';
+
+      // Chain rule validation check
+      const chainDiff = Math.abs((metrics.H_X + (metrics.H_XY - metrics.H_X)) - metrics.H_XY);
+      document.getElementById('chainRuleStatus').textContent = chainDiff < 0.001 ? "Holds (✓)" : "Discrepancy";
+
+      // 2. Render Euler/Venn
+      renderVennPaths(metrics);
+
+      // 3. Update editable PMF table
+      renderPMFTable();
+    }
+
+    function renderPMFTable() {
+      const tbody = document.getElementById('pmfTableBody');
+      tbody.innerHTML = '';
+      
+      const states = ['000', '001', '010', '011', '100', '101', '110', '111'];
+      states.forEach(st => {
+        const tr = document.createElement('tr');
+        const pVal = jointPMF[st] || 0;
+        
+        tr.innerHTML = `
+          <td class="p-1.5 text-center text-blue-400">${st[0]}</td>
+          <td class="p-1.5 text-center text-rose-400">${st[1]}</td>
+          <td class="p-1.5 text-center text-emerald-400">${st[2]}</td>
+          <td class="p-1.5">
+            <input type="number" min="0" max="1" step="0.01" value="${pVal.toFixed(3)}" 
+              data-state="${st}"
+              class="pmf-cell-input w-20 px-1 py-0.5 rounded bg-slate-950 border border-slate-700 text-slate-200 text-right focus:border-indigo-500 focus:outline-none">
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Bind inline change
+      tbody.querySelectorAll('.pmf-cell-input').forEach(input => {
+        input.addEventListener('change', (e) => {
+          const state = e.target.getAttribute('data-state');
+          let newVal = parseFloat(e.target.value);
+          if (isNaN(newVal) || newVal < 0) newVal = 0;
+          jointPMF[state] = newVal;
+          jointPMF = normalizePMF(jointPMF);
+          updateUI();
+        });
+      });
+    }
+
+    const tooltip = document.getElementById('vennTooltip');
+    const tipTitle = document.getElementById('tipTitle');
+    const tipValue = document.getElementById('tipValue');
+    const tipDesc = document.getElementById('tipDesc');
+
+    function showTooltip(e, region) {
+      tipTitle.textContent = region.name;
+      tipValue.textContent = (region.val >= 0 && region.id === 'r_xyz' ? '+' : '') + region.val.toFixed(3) + ' bits';
+      tipDesc.textContent = region.desc;
+      tooltip.style.opacity = '1';
+      moveTooltip(e);
+    }
+
+    function moveTooltip(e) {
+      const svgRect = document.getElementById('vennSvg').getBoundingClientRect();
+      const x = e.clientX - svgRect.left + 15;
+      const y = e.clientY - svgRect.top + 15;
+      tooltip.style.left = `${Math.min(x, svgRect.width - 240)}px`;
+      tooltip.style.top = `${Math.min(y, svgRect.height - 90)}px`;
+    }
+
+    function hideTooltip() {
+      tooltip.style.opacity = '0';
+    }
+
+    function highlightRegions(regionIds) {
+      // De-highlight all
+      document.querySelectorAll('.venn-region').forEach(el => {
+        el.classList.remove('highlighted');
+        el.style.opacity = '0.15';
+      });
+      // Highlight targets
+      regionIds.forEach(id => {
+        const el = document.getElementById(`region-${id}`);
+        if (el) {
+          el.classList.add('highlighted');
+          el.style.opacity = '1.0';
+        }
+      });
+    }
+
+    function resetHover() {
+      document.querySelectorAll('.venn-region').forEach(el => {
+        el.classList.remove('highlighted');
+        el.style.opacity = '';
+      });
+      hideTooltip();
+    }
+
+    function loadPreset(key) {
+      currentPreset = key;
+      const meta = PRESET_METADATA[key];
+      if (!meta) return;
+
+      // Update badge and text
+      document.getElementById('activePresetBadge').textContent = meta.badge;
+      document.getElementById('insightContent').innerHTML = meta.explanation;
+
+      // Update slider configurations
+      const s1 = document.getElementById('paramSlider1');
+      const s2 = document.getElementById('paramSlider2');
+      const s3 = document.getElementById('paramSlider3');
+
+      document.getElementById('slider1Label').textContent = meta.slider1.label;
+      s1.min = meta.slider1.min; s1.max = meta.slider1.max; s1.step = meta.slider1.step;
+      document.getElementById('slider1Desc').textContent = meta.slider1.desc;
+
+      document.getElementById('slider2Label').textContent = meta.slider2.label;
+      s2.min = meta.slider2.min; s2.max = meta.slider2.max; s2.step = meta.slider2.step;
+      document.getElementById('slider2Desc').textContent = meta.slider2.desc;
+
+      document.getElementById('slider3Label').textContent = meta.slider3.label;
+      s3.min = meta.slider3.min; s3.max = meta.slider3.max; s3.step = meta.slider3.step;
+      document.getElementById('slider3Desc').textContent = meta.slider3.desc;
+
+      // Set sensible defaults for each preset
+      if (key === 'fork') {
+        params.p1 = 0.90; params.p2 = 0.08; params.p3 = 0.50;
+      } else if (key === 'collider') {
+        params.p1 = 0.02; params.p2 = 0.50; params.p3 = 0.50;
+      } else if (key === 'markov') {
+        params.p1 = 0.92; params.p2 = 0.88; params.p3 = 0.50;
+      } else if (key === 'independent') {
+        params.p1 = 0.50; params.p2 = 0.50; params.p3 = 0.50;
+      } else if (key === 'redundant') {
+        params.p1 = 0.01; params.p2 = 0.50; params.p3 = 0.50;
+      } else if (key === 'noisy') {
+        params.p1 = 0.15; params.p2 = 0.95; params.p3 = 0.50;
+      }
+
+      s1.value = params.p1;
+      s2.value = params.p2;
+      s3.value = params.p3;
+
+      document.getElementById('slider1Val').textContent = Number(params.p1).toFixed(2);
+      document.getElementById('slider2Val').textContent = Number(params.p2).toFixed(2);
+      document.getElementById('slider3Val').textContent = Number(params.p3).toFixed(2);
+
+      // Recompute distribution & UI
+      recalculateFromSliders();
+    }
+
+    function recalculateFromSliders() {
+      const meta = PRESET_METADATA[currentPreset];
+      jointPMF = meta.builder(params.p1, params.p2, params.p3);
+      updateUI();
+    }
+
+    function randomizeDist() {
+      const pmf = {};
+      for (let x = 0; x <= 1; x++) {
+        for (let y = 0; y <= 1; y++) {
+          for (let z = 0; z <= 1; z++) {
+            pmf[`${x}${y}${z}`] = Math.random();
+          }
+        }
+      }
+      jointPMF = normalizePMF(pmf);
+      document.getElementById('activePresetBadge').textContent = "Custom Random";
+      document.getElementById('insightContent').innerHTML = `
+        <p class="text-indigo-300"><strong>Arbitrary Joint Distribution:</strong> Random probabilities were assigned across all 8 states.</p>
+        <p class="mt-1 text-slate-300">Observe how the decomposed regions adapt. You can fine-tune specific entries in the table below to explore custom dependence structures.</p>
+      `;
+      updateUI();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Attach slider event listeners
+      const s1 = document.getElementById('paramSlider1');
+      const s2 = document.getElementById('paramSlider2');
+      const s3 = document.getElementById('paramSlider3');
+
+      s1.addEventListener('input', (e) => {
+        params.p1 = parseFloat(e.target.value);
+        document.getElementById('slider1Val').textContent = params.p1.toFixed(2);
+        recalculateFromSliders();
+      });
+
+      s2.addEventListener('input', (e) => {
+        params.p2 = parseFloat(e.target.value);
+        document.getElementById('slider2Val').textContent = params.p2.toFixed(2);
+        recalculateFromSliders();
+      });
+
+      s3.addEventListener('input', (e) => {
+        params.p3 = parseFloat(e.target.value);
+        document.getElementById('slider3Val').textContent = params.p3.toFixed(2);
+        recalculateFromSliders();
+      });
+
+      // Load initial default preset
+      loadPreset('fork');
+    });
+  </script>
+</body>
+</html>
